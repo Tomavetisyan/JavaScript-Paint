@@ -7,16 +7,16 @@ var savedImage;
 //Using brush
 var dragging = false;
 //Default brush color (#000000 = black)
-var brushColor = '#000000';
+var currentColor = '#000000';
 //Default line width
-var line_Width=2;
+var lineWidth = 2;
 //Default polygon shapes
-var polygonSides =3;
+var polygonSides = 3;
 //Current tool. Defaut is brush
 var currentTool = 'brush';
 //Drawing boundries
-var canvasWidth = 800;
-var canvasHeight = 800;
+var canvasWidth = window.innerWidth;
+var canvasHeight = window.innerHeight;
 //Toggles drawing
 var drawing = false;
 //Brush x and y points into arrays
@@ -27,7 +27,8 @@ var downPos = [];
 //Storing image states for undo/redo
 var redoList = [];
 var undoList = [];
-
+//Selection tool temp image
+var tempImage;
 
 // Stores size data used to create rubber band shapes
 // that will redraw as the user moves the mouse
@@ -73,16 +74,26 @@ document.addEventListener('DOMContentLoaded', startUp);
 function startUp(){
     canvas = document.getElementById('my-canvas');
     ctx = canvas.getContext('2d');
-    ctx.strokeStyle = brushColor;
-    ctx.lineWidth = line_Width;
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = lineWidth;
+    var myWidth=window.innerWidth;
+    var myHeight=window.innerHeight;
+
+    ctx.canvas.width  = myWidth-56;
+    ctx.canvas.height = myHeight-67;
     //Sets backround to white
-    ctx.lineCap = "round"
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineJoin = ctx.lineCap = "round";
+    // ctx.fillStyle = "white";
+    // ctx.fillRect(0, 0, canvas.width, canvas.height);
+    document.getElementById("width").value=canvasWidth;
+    document.getElementById("height").value=canvasHeight;
+    tempImage = document.getElementById("temp-img");
     //Mouse functions
     canvas.addEventListener("mousedown", mouseDown);
     canvas.addEventListener("mousemove", mouseMove);
     canvas.addEventListener("mouseup", mouseUp);
+    canvas.addEventListener("wheel", mouseScroll);
+
     //Implementing ctrl+z for undo and ctrl+y for redo
     document.onkeyup = function(e){
         if(e.ctrlKey && (e.which==90 || e.which==122)){
@@ -92,18 +103,32 @@ function startUp(){
         }
     }
 }
-function changeTool(tool){
-    //Removes highlight on current tool and shape dropdown icon
-    document.getElementById(currentTool).className="";
-    document.getElementById("shape-dropdown").className="";
-    //Highlight current tool
-    document.getElementById(tool).className="selected";
-    //Highlight shape dropdown icon when circle or polygon is selected
-    if(tool==="circle" || tool==="polygon"){
-        document.getElementById("shape-dropdown").className="selected";
+//WOP no button implemented yet
+function drawGrid() {
+    for (x = 0; x <= canvasWidth; x += 20) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvasHeight);
+        for (y = 0; y <= canvasHeight; y += 20) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvasWidth, y);
+        }
     }
-    //Change current tool
-    currentTool=tool;
+    ctx.stroke();
+};
+function setTransparant(alpha){
+  //identical to clearCanvas(), but alters background opacity
+  canvas.width = canvas.width;
+  xPositions.length = 0;
+  yPositions.length = 0;
+  downPos.length = 0;
+  //Fix line/style width not staying the same
+  ctx.lineJoin = ctx.lineCap = "round";
+  ctx.lineWidth = lineWidth;
+  if (alpha > 0)
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+  else
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 function changeTool(tool){
     //Removes highlight on current tool and shape dropdown icon
@@ -124,6 +149,9 @@ function draw(loc){
         case "brush":
             //Draw line
             drawBrush();
+            break;
+        case "spray-can":
+            //Draw radial gradient
             break;
         case "eraser":
             //Draw line, but white
@@ -148,6 +176,9 @@ function draw(loc){
             getPolygon();
             ctx.stroke();
             break;
+        case "selection":
+            selectArea();
+            break;
         default:
             break;
     }
@@ -168,9 +199,12 @@ function mouseDown(e){
     //Store that the mouse is being held down
     dragging=true;
     //Store line points
-    if(currentTool==='brush' || currentTool==='eraser'){
+    if(currentTool==='brush' || currentTool==='eraser' || currentTool==='spray-can'){
         drawing = true;
         storePos(loc.x, loc.y);
+        if(currentTool==='spray-can'){
+            ctx.moveTo(e.clientX, e.clientY);
+        }
     }
 };
 //Get canvas position
@@ -195,32 +229,47 @@ function redrawCanvas(){
     ctx.putImageData(savedImage,0,0);
 }
 function mouseMove(e){
-    canvas.style.cursor = "crosshair";
-    loc = getMousePosition(e.clientX, e.clientY);
-    //If using the brush or eraser and holding down the mouse, store points
-    if((currentTool==='brush' || currentTool==='eraser') && drawing && dragging){
-        if(currentTool==='brush'){
-            ctx.strokeStyle = document.getElementById("my-color").value;
-        }
-        if(currentTool==='eraser'){
-            ctx.strokeStyle = "white";
-        }
-        //Draw only inside canvas
-        if(loc.x > 0 && loc.x < canvasWidth && loc.y > 0 && loc.y < canvasHeight){
-            storePos(loc.x, loc.y, true);
-        }
-        redrawCanvas();
-        drawBrush();
-    }else{
-        ctx.strokeStyle = document.getElementById("my-color").value;
-        if(dragging){
+    if (drawing && currentTool==='spray-can'){
+        var radgrad = ctx.createRadialGradient(
+        e.clientX,e.clientY,10,e.clientX,e.clientY,20);
+        myColor = document.getElementById("my-color").value;
+        radgrad.addColorStop(0, myColor);
+        radgrad.addColorStop(0.5, myColor);
+        radgrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = radgrad;
+        ctx.fillRect(e.clientX-20, e.clientY-20, 40, 40);
+        
+    }
+    else{
+        canvas.style.cursor = "crosshair";
+        loc = getMousePosition(e.clientX, e.clientY);
+        //If using the brush or eraser and holding down the mouse, store points
+        if((currentTool==='brush' || currentTool==='eraser') && drawing && dragging){
+            if(currentTool==='brush'){
+                ctx.strokeStyle = document.getElementById("my-color").value;
+            }
+            if(currentTool==='eraser'){
+                ctx.strokeStyle = "white";
+            }
+            //Draw only inside canvas
+            if(loc.x > 0 && loc.x < canvasWidth && loc.y > 0 && loc.y < canvasHeight){
+                storePos(loc.x, loc.y, true);
+            }
             redrawCanvas();
-            updateRubberbandOnMove(loc);
+            drawBrush();
+        }else{
+            ctx.strokeStyle = document.getElementById("my-color").value;
+            if(dragging){
+                redrawCanvas();
+                updateRubberbandOnMove(loc);
+            }
         }
     }
+
 };
 //Connect brush points in the array
 function drawBrush(){
+    ctx.lineJoin = ctx.lineCap = "round";
     for(var i=1;i<xPositions.length;i++){
         ctx.beginPath();
         if(downPos[i]){
@@ -233,11 +282,13 @@ function drawBrush(){
         ctx.stroke();
     }
 }
+
 //Reset mouse on mouseup
 function mouseUp(e){
     canvas.style.cursor = "default";
     loc = getMousePosition(e.clientX, e.clientY);
-    redrawCanvas();
+    if (currentTool !='spray-can')
+        redrawCanvas();
     updateRubberbandOnMove(loc);
     dragging = false;
     drawing = false;
@@ -344,12 +395,16 @@ function clearCanvas(){
     xPositions.length = 0;
     yPositions.length = 0;
     downPos.length = 0;
+    //Fix line/style width not staying the same
+    ctx.lineJoin = ctx.lineCap = "round";
+    ctx.lineWidth = lineWidth;
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 //Changes and displays line width
 function changeLineWidth(slideAmount) {
-    ctx.lineWidth=slideAmount;
+    ctx.lineWidth = slideAmount;
+    lineWidth = slideAmount;
     var sliderDiv = document.getElementById("slider-amount");
     sliderDiv.innerHTML = slideAmount;
 }
@@ -415,10 +470,10 @@ function restoreState(list){
         }
         var stateToRestore = list.pop();
         var img = document.createElement('img');
-        img.setAttribute('src',stateToRestore);
+        img.setAttribute('src', stateToRestore);
         img.onload = function(){
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-            ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+            ctx.drawImage(img, 0, 0);
         }
     }
 }
@@ -436,7 +491,12 @@ function openImage(){
             img.src = e.target.result;
             img.onload = function(){
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                //Fits image to canvas iff it is larger than the canvas itself
+                if(this.width <= canvasWidth && this.height <= canvasHeight){
+                    ctx.drawImage(img, 0, 0);
+                }else{
+                    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                }
             }
         }
         reader.readAsDataURL(file);
@@ -446,51 +506,85 @@ function openImage(){
     redoList = [];
     undoList = [];
 }
-//End open file via explorer
 
+function changeColorBg(color) {
+    // console.log(color)
+    var wi=document.querySelector('#my-canvas').offsetWidth;
+    var he=document.querySelector('#my-canvas').offsetHeight;
+    // var can=document.createElement('canvas');
+    // can.width=wi;
+    // can.height=he;
+    // var ctx2=can.getContext('2d');
+    // ctx2.fillStyle=color;
+    // ctx2.fillRect(0,0,wi,he);
+    // var ctx3=canvas.getContext('2d');
+    // console.log(can)
+    // ctx3.globalCompositeOperation='destination-over';
+    // ctx3.drawImage(can,0,0,wi,he);
+    // ctx3.globalCompositeOperation='source-over';
+    var c=document.querySelector('#my-canvas-bg');
+    c.width=wi;
+    c.height=he;
+    var ct=c.getContext('2d');
+    ct.fillStyle=color;
+    ct.fillRect(0,0,999999,999999);
+    // ct.drawImage(can,0,0,999999,999999);
+}
+window.onload=function () {
+    document.querySelector('#my-color-bg').addEventListener('change',function () {
+        changeColorBg(document.querySelector('#my-color-bg').value)
+    })
+}
+//End open file via explorer
 //Color change buttons in dropdown
 function changeColor(color){
-    brushColor = color;
-    ctx.strokeStyle = color;
     document.getElementById("my-color").value = color;
+    currentColor = color;
+    ctx.strokeStyle = color;
+
     //Set custom color and sliders to correct positions for preset colors  #000000
-    document.getElementById("custom-color").value = color;
-    document.getElementById("custom-color").style.background = color;
     document.getElementById("color-slider-r").value = hexToDecimal(color.substr(1,2));
     document.getElementById("color-slider-g").value = hexToDecimal(color.substr(3,2));
     document.getElementById("color-slider-b").value = hexToDecimal(color.substr(5,2));
-    (document.getElementById("rgb-amount")).innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value 
-    + ',' + document.getElementById("color-slider-b").value + ')';
+    (document.getElementById("rgb-amount")).innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ','
+        + document.getElementById("color-slider-g").value
+        + ',' + document.getElementById("color-slider-b").value + ')';
 }
+
 //End color change
 //RGB color
-function changeRGB(r , g, b){
-    document.getElementById("custom-color").style.background = 
-        "#" + componentToHex(document.getElementById("color-slider-r").value) + componentToHex(document.getElementById("color-slider-g").value) + 
-        componentToHex(document.getElementById("color-slider-b").value);
-        
-    document.getElementById("custom-color").value = 
-        "#" + componentToHex(document.getElementById("color-slider-r").value) + componentToHex(document.getElementById("color-slider-g").value) + 
-        componentToHex(document.getElementById("color-slider-b").value);  
+function changeRGB(r, g, b){
+    document.getElementById(currentColor).setAttribute("style", "background:#" + componentToHex(document.getElementById("color-slider-r").value) + componentToHex(document.getElementById("color-slider-g").value) +
+    componentToHex(document.getElementById("color-slider-b").value));
 
-    changeColor(document.getElementById("custom-color").value);
+    document.getElementById(currentColor).value =
+    "#" + componentToHex(document.getElementById("color-slider-r").value) + componentToHex(document.getElementById("color-slider-g").value) +
+    componentToHex(document.getElementById("color-slider-b").value);
 
+    var newColor = "";
+    if(g===undefined && b===undefined){
+        newColor = "#" + componentToHex(r) + currentColor.substr(3,4);
+    }else if(r===undefined && b===undefined){
+        newColor = "#" + currentColor.substr(1,2) + componentToHex(g) + currentColor.substr(5,2);
+    }else if(r===undefined && g===undefined){
+        newColor = "#" + currentColor.substr(1,4) + componentToHex(b);
+    }
+    document.getElementById(currentColor).setAttribute("id", newColor);
+    changeColor(newColor);
     if(g===undefined && b===undefined){
         var bAmount = document.getElementById("rgb-amount");
-        bAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value 
+        bAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value
             + ',' + document.getElementById("color-slider-b").value + ')';
-    }
-    if(r===undefined && b===undefined){
+    }else if(r===undefined && b===undefined){
         var gAmount = document.getElementById("rgb-amount");
-        gAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value 
+        gAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value
             + ',' + document.getElementById("color-slider-b").value + ')';;
-    }
-    if(r===undefined && g===undefined){
+    }else if(r===undefined && g===undefined){
         var bAmount = document.getElementById("rgb-amount");
-        bAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value 
+        bAmount.innerHTML = 'RGB(' + document.getElementById("color-slider-r").value + ',' + document.getElementById("color-slider-g").value
             + ',' + document.getElementById("color-slider-b").value + ')';;
     }
-    
+
 }
 //Convert RGB to Hex
 function componentToHex(rgb) {
@@ -506,5 +600,74 @@ function hexToDecimal(hex){
 }
 //End RGB color
 //Attempting basic selection tool
-
+function selectArea(){
+    if((shapeBoundingBox.wdith || shapeBoundingBox.height) == 0){
+        return false;
+    }
+    var selection = ctx.getImageData(mousedown.x, mousedown.y, 
+        shapeBoundingBox.width, shapeBoundingBox.height);
+    //Create temp canvas to use toDataURL() from a portion of a canvas
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = shapeBoundingBox.width + 2;
+    tempCanvas.height = shapeBoundingBox.height + 2;
+    var tempCtx = tempCanvas.getContext('2d');
+    tempCtx.putImageData(selection, 0, 0);
+    //Create image element and move to correct location
+    var image = document.getElementById("temp-img");
+    image.setAttribute("src", tempCanvas.toDataURL());
+    image.style.transform = "translate3d(" + (mousedown.x + 44) + "px, " + (mousedown.y - canvas.height - 18) + "px, 0)";
+    image.style.border = "1px dashed #000000";
+    //Clear old position
+    ctx.clearRect(mousedown.x, mousedown.y, 
+        shapeBoundingBox.width, shapeBoundingBox.height);
+    //Writes selection to top left
+    //ctx.putImageData(selection, 0, 0);
+}
+//Selection helper
+/*tempImage.onmousedown = function(event) {
+    let shiftX = event.clientX - tempImage.getBoundingClientRect().left;
+    let shiftY = event.clientY - tempImage.getBoundingClientRect().top;
+    tempImage.style.position = 'absolute';
+    tempImage.style.zIndex = 1000;
+    document.body.append(tempImage);
+    moveAt(event.pageX, event.pageY);
+    function moveAt(pageX, pageY) {
+        tempImage.style.left = pageX - shiftX + 'px';
+        tempImage.style.top = pageY - shiftY + 'px';
+    }
+    function onMouseMove(event) {
+        moveAt(event.pageX, event.pageY);
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    tempImage.onmouseup = function() {
+        document.removeEventListener('mousemove', onMouseMove);
+        tempImage.onmouseup = null;
+    };
+};
+tempImage.ondragstart = function() {
+    return false;
+};*/
 //End basic selection tool
+function mouseScroll(e){
+            // cross-browser wheel delta
+            var delta = ((e.deltaY || -e.wheelDelta || e.detail) >> 10) || 1;
+        if(delta<1){
+            canvas.style.width = Math.max(100, canvasWidth-50)+ "px";
+            canvas.style.height = Math.max(100, canvasHeight-50) + "px";
+            canvasWidth =canvasWidth-50;
+            canvasHeight =canvasHeight-50;
+        }else{
+            canvas.style.width = Math.max(100, canvasWidth+50)+ "px";
+            canvas.style.height = Math.max(100, canvasHeight+50) + "px";
+            canvasWidth =canvasWidth+50;
+            canvasHeight =canvasHeight+50;
+        }
+}
+function changeWidth(width){
+    canvas.style.width = Math.min(window.innerWidth-70,Math.max(100, width))+ "px";
+    document.getElementById("width").value=Math.min(window.innerWidth,Math.max(100, width));
+}
+function changeHeight(height){
+    canvas.style.height = Math.min(window.innerHeight-70,Math.max(100, height)) + "px";
+    document.getElementById("height").value=Math.min(window.innerHeight,Math.max(100, height));
+}
