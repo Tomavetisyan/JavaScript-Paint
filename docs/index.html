@@ -19,7 +19,6 @@
                 <div class ="b1-inner">
                     <nav class="nav flex-column">
                         <a class="selected" href="#" id="brush" onclick="changeTool('brush')"><img class="icons" src="icons/brush-icon.png"></a>
-                        <a href="#" id="spray-can" onclick="changeTool('spray-can')"><img class="icons" src="icons/spraycan-icon.png"></a>
                         <a href="#" id="eraser" onclick="changeTool('eraser')"><img class="icons" src="icons/eraser-icon.png"></a>
                         <a href="#" id="selection" onclick="changeTool('selection')"><img class="icons" src="icons/text-icon.png"></a>
                         <a href="#" id="line" onclick="changeTool('line')"><img class="icons" src="icons/line-icon.png"></a>
@@ -48,21 +47,6 @@
                                     <input type="range" min="0" max="255" value="0" class="color-slider-r" id="color-slider-r" onchange="changeRGB(this.value,undefined,undefined)">
                                     <input type="range" min="0" max="255" value="0" class="color-slider-g" id="color-slider-g" onchange="changeRGB(undefined,this.value,undefined)">
                                     <input type="range" min="0" max="255" value="0" class="color-slider-b" id="color-slider-b" onchange="changeRGB(undefined,undefined,this.value)">
-                            </div>
-                        </div>
-                        <div class="color-dropdown"><img class="icons" src="icons/bg.png">
-                            <div class="color-dropdown-content">
-                                <a href="#" id="#000000-bg" style="background:#000000" onclick="changeColorBg('#000000')"></a>
-                                <a href="#" id="#0000FF-bg" style="background:#0000FF" onclick="changeColorBg('#0000FF')"></a>
-                                <a href="#" id="#FF0000-bg" style="background:#FF0000" onclick="changeColorBg('#FF0000')"></a>
-                                <a href="#" id="#008000-bg" style="background:#008000" onclick="changeColorBg('#008000')"></a>
-                                <a href="#" id="#FFFF00-bg" style="background:#FFFF00" onclick="changeColorBg('#FFFF00')"></a>
-                                <a href="#" id="#800080-bg" style="background:#800080" onclick="changeColorBg('#800080')"></a>
-                                <a href="#" id="#FFA500-bg" style="background:#FFA500" onclick="changeColorBg('#FFA500')"></a>
-                                <a href="#" id="#ADD8E6-bg" style="background:#ADD8E6" onclick="changeColorBg('#ADD8E6')"></a>
-
-                                <input type="color" id="my-color-bg">
-                                <br><br>
                             </div>
                         </div>
                         <div class="size-dropdown"><img class="icons" src="icons/size-icon.png">
